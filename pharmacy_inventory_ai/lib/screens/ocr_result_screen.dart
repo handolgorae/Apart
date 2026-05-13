@@ -64,7 +64,7 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('OCR 결과 확인'),
+        title: const Text('약품 추가'),
         actions: [
           TextButton(
             onPressed: _save,

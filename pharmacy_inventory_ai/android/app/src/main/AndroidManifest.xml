@@ -40,9 +40,5 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
-        <!-- ML Kit 텍스트 인식 모델 자동 다운로드 -->
-        <meta-data
-            android:name="com.google.mlkit.vision.DEPENDENCIES"
-            android:value="ocr_kr,ocr" />
     </application>
 </manifest>
