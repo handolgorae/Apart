@@ -11,7 +11,7 @@ class GeminiMedicineResult {
 
 class GeminiService {
   static final _model = GenerativeModel(
-    model: 'gemini-1.5-flash',
+    model: 'gemini-2.0-flash-lite',
     apiKey: ApiConfig.geminiApiKey,
   );
 

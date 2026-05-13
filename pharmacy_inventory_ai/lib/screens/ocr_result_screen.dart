@@ -19,7 +19,6 @@ class OcrResultScreen extends StatefulWidget {
 }
 
 class _OcrResultScreenState extends State<OcrResultScreen> {
-  // {name: String, quantity: int, selected: bool}
   late List<Map<String, dynamic>> _items;
   final _nameCtrl = TextEditingController();
   final _qtyCtrl = TextEditingController(text: '0');
@@ -28,7 +27,7 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
   void initState() {
     super.initState();
     _items = widget.geminiResults
-        .map((r) => {'name': r.name, 'quantity': r.quantity, 'selected': true})
+        .map((r) => {'name': r.name, 'quantity': r.quantity})
         .toList();
   }
 
@@ -39,41 +38,48 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
     super.dispose();
   }
 
-  void _addCustom() {
+  void _addItem() {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) return;
-    final qty = int.tryParse(_qtyCtrl.text) ?? 0;
+    final qty = int.tryParse(_qtyCtrl.text.trim()) ?? 0;
     setState(() {
-      _items.add({'name': name, 'quantity': qty, 'selected': true});
+      _items.insert(0, {'name': name, 'quantity': qty});
       _nameCtrl.clear();
       _qtyCtrl.text = '0';
     });
+    FocusScope.of(context).unfocus();
+  }
+
+  void _removeItem(int index) {
+    setState(() => _items.removeAt(index));
   }
 
   Future<void> _save() async {
-    final selected =
-        _items.where((e) => e['selected'] == true).toList();
-    if (selected.isEmpty) {
+    if (_items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('추가할 약품을 하나 이상 선택하세요.')),
+        const SnackBar(content: Text('추가할 약품이 없습니다.')),
       );
       return;
     }
     final provider = context.read<MedicineProvider>();
+    final count = _items.length;
     await provider.addFromGemini(
-      selected.map((e) => {'name': e['name'] as String, 'quantity': e['quantity'] as int}).toList(),
+      _items
+          .map((e) => {
+                'name': e['name'] as String,
+                'quantity': e['quantity'] as int,
+              })
+          .toList(),
     );
     if (!mounted) return;
     Navigator.popUntil(context, (r) => r.isFirst);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${selected.length}개 약품이 추가되었습니다.')),
+      SnackBar(content: Text('$count개 약품이 추가되었습니다.')),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final selectedCount = _items.where((e) => e['selected'] == true).length;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('AI 분석 결과'),
@@ -94,7 +100,7 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
             child: Image.file(widget.imageFile, fit: BoxFit.cover),
           ),
 
-          // 직접 추가
+          // 직접 추가 영역
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
             child: Row(
@@ -103,6 +109,8 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
                   flex: 3,
                   child: TextField(
                     controller: _nameCtrl,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _addItem(),
                     decoration: const InputDecoration(
                       hintText: '약품명 직접 입력',
                       border: OutlineInputBorder(),
@@ -118,6 +126,10 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
                   child: TextField(
                     controller: _qtyCtrl,
                     keyboardType: TextInputType.number,
+                    onTap: () => _qtyCtrl.selection = TextSelection(
+                      baseOffset: 0,
+                      extentOffset: _qtyCtrl.text.length,
+                    ),
                     decoration: const InputDecoration(
                       hintText: '수량',
                       border: OutlineInputBorder(),
@@ -128,7 +140,10 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
                   ),
                 ),
                 const SizedBox(width: 6),
-                FilledButton(onPressed: _addCustom, child: const Text('추가')),
+                FilledButton(
+                  onPressed: _addItem,
+                  child: const Text('추가'),
+                ),
               ],
             ),
           ),
@@ -140,7 +155,7 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
                 Text(
                   widget.geminiResults.isEmpty
                       ? 'AI 인식 결과 없음 — 직접 입력하세요'
-                      : 'AI 인식 결과 — $selectedCount개 선택됨',
+                      : 'AI 인식 결과 — ${_items.length}개',
                   style: const TextStyle(
                       fontWeight: FontWeight.w600, fontSize: 13),
                 ),
@@ -170,18 +185,18 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
                     itemCount: _items.length,
                     itemBuilder: (_, i) {
                       final item = _items[i];
-                      return CheckboxListTile(
+                      return ListTile(
                         title: Text(item['name'] as String),
-                        subtitle: item['quantity'] > 0
-                            ? Text('AI 추정 수량: ${item['quantity']}개',
+                        subtitle: (item['quantity'] as int) > 0
+                            ? Text('수량: ${item['quantity']}개',
                                 style: const TextStyle(
                                     fontSize: 12,
                                     color: Color(0xFF1565C0)))
                             : null,
-                        value: item['selected'] as bool,
-                        onChanged: (v) => setState(
-                            () => _items[i]['selected'] = v ?? false),
-                        controlAffinity: ListTileControlAffinity.leading,
+                        trailing: IconButton(
+                          icon: const Icon(Icons.close, size: 20),
+                          onPressed: () => _removeItem(i),
+                        ),
                         dense: true,
                       );
                     },
@@ -198,7 +213,7 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
               minimumSize: const Size.fromHeight(48),
               backgroundColor: const Color(0xFF1565C0),
             ),
-            child: Text('$selectedCount개 약품 목록에 추가'),
+            child: Text('${_items.length}개 약품 목록에 추가'),
           ),
         ),
       ),
