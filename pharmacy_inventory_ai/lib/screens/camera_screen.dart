@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../services/ocr_service.dart';
 import 'ocr_result_screen.dart';
 
@@ -15,14 +16,28 @@ class _CameraScreenState extends State<CameraScreen> {
   CameraController? _ctrl;
   bool _ready = false;
   bool _busy = false;
+  String? _errorMsg;
 
   @override
   void initState() {
     super.initState();
-    _init();
+    _requestPermissionAndInit();
   }
 
-  Future<void> _init() async {
+  Future<void> _requestPermissionAndInit() async {
+    final status = await Permission.camera.request();
+    if (!mounted) return;
+
+    if (status.isDenied || status.isPermanentlyDenied) {
+      setState(() => _errorMsg = '카메라 권한이 필요합니다.\n설정에서 권한을 허용해주세요.');
+      if (status.isPermanentlyDenied) openAppSettings();
+      return;
+    }
+
+    await _initCamera();
+  }
+
+  Future<void> _initCamera() async {
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) throw Exception('카메라를 찾을 수 없습니다.');
@@ -36,10 +51,7 @@ class _CameraScreenState extends State<CameraScreen> {
       await _ctrl!.initialize();
       if (mounted) setState(() => _ready = true);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('카메라 오류: $e')));
-      }
+      if (mounted) setState(() => _errorMsg = '카메라 오류: $e');
     }
   }
 
@@ -56,8 +68,7 @@ class _CameraScreenState extends State<CameraScreen> {
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) =>
-              OcrResultScreen(imageFile: file, ocrNames: names),
+          builder: (_) => OcrResultScreen(imageFile: file, ocrNames: names),
         ),
       );
     } catch (e) {
@@ -85,30 +96,41 @@ class _CameraScreenState extends State<CameraScreen> {
         foregroundColor: Colors.white,
         title: const Text('약 사진 촬영'),
       ),
-      body: _ready
-          ? Stack(
-              fit: StackFit.expand,
-              children: [
-                CameraPreview(_ctrl!),
-                if (_busy)
-                  Container(
-                    color: Colors.black54,
-                    alignment: Alignment.center,
-                    child: const Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CircularProgressIndicator(color: Colors.white),
-                        SizedBox(height: 16),
-                        Text('OCR 분석 중...',
-                            style:
-                                TextStyle(color: Colors.white, fontSize: 16)),
-                      ],
-                    ),
-                  ),
-              ],
+      body: _errorMsg != null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  _errorMsg!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                ),
+              ),
             )
-          : const Center(
-              child: CircularProgressIndicator(color: Colors.white)),
+          : _ready
+              ? Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CameraPreview(_ctrl!),
+                    if (_busy)
+                      Container(
+                        color: Colors.black54,
+                        alignment: Alignment.center,
+                        child: const Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CircularProgressIndicator(color: Colors.white),
+                            SizedBox(height: 16),
+                            Text('OCR 분석 중...',
+                                style: TextStyle(
+                                    color: Colors.white, fontSize: 16)),
+                          ],
+                        ),
+                      ),
+                  ],
+                )
+              : const Center(
+                  child: CircularProgressIndicator(color: Colors.white)),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: _ready
           ? FloatingActionButton.large(
