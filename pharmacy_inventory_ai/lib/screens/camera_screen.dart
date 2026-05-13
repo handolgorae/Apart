@@ -59,26 +59,35 @@ class _CameraScreenState extends State<CameraScreen> {
     if (_ctrl == null || !_ctrl!.value.isInitialized || _busy) return;
     setState(() => _busy = true);
 
+    File? file;
     try {
       final xFile = await _ctrl!.takePicture();
-      final file = File(xFile.path);
-      final names = await OcrService.extractLines(file);
-
-      if (!mounted) return;
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => OcrResultScreen(imageFile: file, ocrNames: names),
-        ),
-      );
+      file = File(xFile.path);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('오류: $e')));
+            .showSnackBar(SnackBar(content: Text('촬영 오류: $e')));
       }
-    } finally {
-      if (mounted) setState(() => _busy = false);
+      setState(() => _busy = false);
+      return;
     }
+
+    // OCR 실패해도 수동 입력 화면으로 이동
+    List<String> names = [];
+    try {
+      names = await OcrService.extractLines(file);
+    } catch (_) {
+      // OCR 실패 무시 — 수동 입력으로 대체
+    }
+
+    if (!mounted) return;
+    setState(() => _busy = false);
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OcrResultScreen(imageFile: file!, ocrNames: names),
+      ),
+    );
   }
 
   @override
