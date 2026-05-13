@@ -1,0 +1,122 @@
+import 'dart:io';
+import 'package:camera/camera.dart';
+import 'package:flutter/material.dart';
+import '../services/ocr_service.dart';
+import 'ocr_result_screen.dart';
+
+class CameraScreen extends StatefulWidget {
+  const CameraScreen({super.key});
+
+  @override
+  State<CameraScreen> createState() => _CameraScreenState();
+}
+
+class _CameraScreenState extends State<CameraScreen> {
+  CameraController? _ctrl;
+  bool _ready = false;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    try {
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) throw Exception('카메라를 찾을 수 없습니다.');
+
+      final rear = cameras.firstWhere(
+        (c) => c.lensDirection == CameraLensDirection.back,
+        orElse: () => cameras.first,
+      );
+
+      _ctrl = CameraController(rear, ResolutionPreset.high, enableAudio: false);
+      await _ctrl!.initialize();
+      if (mounted) setState(() => _ready = true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('카메라 오류: $e')));
+      }
+    }
+  }
+
+  Future<void> _shoot() async {
+    if (_ctrl == null || !_ctrl!.value.isInitialized || _busy) return;
+    setState(() => _busy = true);
+
+    try {
+      final xFile = await _ctrl!.takePicture();
+      final file = File(xFile.path);
+      final names = await OcrService.extractLines(file);
+
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              OcrResultScreen(imageFile: file, ocrNames: names),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('오류: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: const Text('약 사진 촬영'),
+      ),
+      body: _ready
+          ? Stack(
+              fit: StackFit.expand,
+              children: [
+                CameraPreview(_ctrl!),
+                if (_busy)
+                  Container(
+                    color: Colors.black54,
+                    alignment: Alignment.center,
+                    child: const Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(color: Colors.white),
+                        SizedBox(height: 16),
+                        Text('OCR 분석 중...',
+                            style:
+                                TextStyle(color: Colors.white, fontSize: 16)),
+                      ],
+                    ),
+                  ),
+              ],
+            )
+          : const Center(
+              child: CircularProgressIndicator(color: Colors.white)),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: _ready
+          ? FloatingActionButton.large(
+              onPressed: _busy ? null : _shoot,
+              backgroundColor: Colors.white,
+              child: const Icon(Icons.camera, color: Colors.black, size: 36),
+            )
+          : null,
+    );
+  }
+}
