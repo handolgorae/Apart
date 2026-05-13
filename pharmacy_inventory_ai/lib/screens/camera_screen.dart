@@ -72,8 +72,15 @@ class _CameraScreenState extends State<CameraScreen> {
     List<GeminiMedicineResult> results = [];
     try {
       results = await GeminiService.analyze(file);
-    } catch (_) {
-      // 실패 시 빈 리스트로 수동 입력
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('AI 분석 실패: $e'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
 
     if (!mounted) return;
