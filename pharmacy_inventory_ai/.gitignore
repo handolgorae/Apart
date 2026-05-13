@@ -46,3 +46,6 @@ build/
 
 # Coverage
 coverage/
+
+# API 키 (절대 커밋 금지)
+lib/config/api_config.dart

@@ -54,7 +54,22 @@ class MedicineProvider extends ChangeNotifier {
               createdAt: DateTime.now(),
             ))
         .toList();
+    _all.addAll(newMeds);
+    await _repo.insertAll(newMeds);
+    notifyListeners();
+  }
 
+  Future<void> addFromGemini(List<Map<String, dynamic>> items) async {
+    final existing = _all.map((m) => m.name).toSet();
+    final newMeds = items
+        .where((e) => !existing.contains(e['name']))
+        .map((e) => Medicine(
+              id: _uuid.v4(),
+              name: e['name'] as String,
+              quantity: e['quantity'] as int? ?? 0,
+              createdAt: DateTime.now(),
+            ))
+        .toList();
     _all.addAll(newMeds);
     await _repo.insertAll(newMeds);
     notifyListeners();

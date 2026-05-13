@@ -29,6 +29,9 @@ dependencies:
   # UUID
   uuid: ^4.4.0
 
+  # Gemini Vision API
+  google_generative_ai: ^0.4.6
+
   # 런타임 권한 요청
   permission_handler: ^11.3.1
 
