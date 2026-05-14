@@ -1,0 +1,6 @@
+node_modules
+.next
+*.bat
+*.ps1
+*.vbs
+.env*.local
